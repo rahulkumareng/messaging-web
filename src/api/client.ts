@@ -73,6 +73,12 @@ export const conversationsApi = {
   getAll: () => apiClient.get<Conversation[]>('/conversations'),
   createGroup: (title: string, participantIds: string[]) =>
     apiClient.post<Conversation>('/conversations/group', { title, participantIds }),
+  updateTitle: (id: string, title: string) =>
+    apiClient.patch<Conversation>(`/conversations/${id}/title`, { title }),
+  addParticipants: (id: string, participantIds: string[]) =>
+    apiClient.post<Conversation>(`/conversations/${id}/participants`, { participantIds }),
+  createDirect: (targetUserId: string) =>
+    apiClient.post<Conversation>('/conversations/direct', { targetUserId }),
 };
 
 export default apiClient;
