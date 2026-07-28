@@ -60,8 +60,19 @@ export const authApi = {
     apiClient.post<AuthResponse>('/auth/login', { email, password }),
 };
 
+export interface User {
+  id: string;
+  email: string;
+}
+
+export const usersApi = {
+  search: (query: string) => apiClient.get<User[]>(`/users/search?q=${query}`),
+};
+
 export const conversationsApi = {
   getAll: () => apiClient.get<Conversation[]>('/conversations'),
+  createGroup: (title: string, participantIds: string[]) =>
+    apiClient.post<Conversation>('/conversations/group', { title, participantIds }),
 };
 
 export default apiClient;
