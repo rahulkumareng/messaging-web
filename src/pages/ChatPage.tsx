@@ -26,16 +26,17 @@ const ChatPage: React.FC = () => {
       setConversations(response.data);
       
       // Update active conversation reference if it exists
-      if (activeConversation) {
-        const updated = response.data.find(c => c.id === activeConversation.id);
-        if (updated) setActiveConversation(updated);
-      }
+      setActiveConversation(prev => {
+        if (!prev) return null;
+        const updated = response.data.find(c => c.id === prev.id);
+        return updated || prev;
+      });
     } catch (err) {
       console.error('Failed to fetch conversations:', err);
     } finally {
       setLoading(false);
     }
-  }, [activeConversation]);
+  }, []);
 
   useEffect(() => {
     fetchConversations();
