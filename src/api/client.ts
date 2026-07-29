@@ -81,4 +81,19 @@ export const conversationsApi = {
     apiClient.post<Conversation>('/conversations/direct', { targetUserId }),
 };
 
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+}
+
+export const messagesApi = {
+  getMessages: (conversationId: string, limit = 20) =>
+    axios.get<{ conversationId: string; messages: ChatMessage[] }>(
+      `http://localhost:8080/messages/${conversationId}?limit=${limit}`
+    ),
+};
+
 export default apiClient;

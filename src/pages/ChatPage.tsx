@@ -6,7 +6,7 @@ import AvatarInitials from '../components/AvatarInitials';
 import CreateGroupModal from '../components/CreateGroupModal';
 import GroupSettingsModal from '../components/GroupSettingsModal';
 import NewDirectChatModal from '../components/NewDirectChatModal';
-import { conversationsApi } from '../api/client';
+import { conversationsApi, messagesApi } from '../api/client';
 import type { Conversation } from '../api/client';
 import { useChatSocket } from '../hooks/useChatSocket';
 import type { ChatMessageItem } from '../components/ChatView';
@@ -47,6 +47,37 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  // Fetch message history whenever active conversation changes
+  useEffect(() => {
+    if (!activeConversation) return;
+
+    const convId = activeConversation.id;
+    messagesApi.getMessages(convId, 20)
+      .then(res => {
+        const fetchedMessages = res.data.messages || [];
+        const historyMsgs: ChatMessageItem[] = fetchedMessages.map(m => {
+          const participant = activeConversation.participants.find(p => p.userId === m.senderId);
+          return {
+            id: m.id,
+            conversationId: m.conversationId,
+            senderId: m.senderId,
+            senderEmail: participant?.email,
+            content: m.content,
+            createdAt: m.createdAt,
+            status: 'delivered' as const,
+          };
+        });
+
+        setMessagesMap(prev => ({
+          ...prev,
+          [convId]: historyMsgs,
+        }));
+      })
+      .catch(err => {
+        console.error('Failed to fetch message history:', err);
+      });
+  }, [activeConversation?.id]);
 
   // Handle incoming WS frames
   useEffect(() => {
