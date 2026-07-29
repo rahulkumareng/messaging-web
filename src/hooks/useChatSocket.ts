@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
+
 export interface WSMessageData {
   messageId?: string;
   conversationId: string;
@@ -7,7 +9,14 @@ export interface WSMessageData {
   content: string;
   createdAt?: string;
   clientMessageId?: string;
-  status?: 'sending' | 'sent' | 'delivered' | 'read';
+  status?: MessageStatus;
+  // delivered/read receipt fields
+  recipientId?: string;
+  deliveredAt?: string;
+  lastReadMessageId?: string;
+  readerId?: string;
+  readAt?: string;
+  deliveredCount?: number;
 }
 
 interface WSFrame {
@@ -64,28 +73,44 @@ export const useChatSocket = (token: string | null) => {
     };
   }, [token]);
 
-  const sendMessage = useCallback((conversationId: string, content: string, clientMessageId: string) => {
+  const sendRaw = useCallback((payload: unknown): boolean => {
     if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-      console.error('Cannot send message: WebSocket is not connected');
+      console.error('Cannot send: WebSocket is not connected');
       return false;
     }
-
-    const payload = {
-      event: 'message',
-      data: {
-        conversationId,
-        content,
-        clientMessageId,
-      },
-    };
-
     socketRef.current.send(JSON.stringify(payload));
     return true;
   }, []);
+
+  /** Send a new chat message (Kafka-first: Gateway will ACK after Kafka publish). */
+  const sendMessage = useCallback(
+    (conversationId: string, content: string, clientMessageId: string): boolean => {
+      return sendRaw({ event: 'message', data: { conversationId, content, clientMessageId } });
+    },
+    [sendRaw],
+  );
+
+  /** Acknowledge message delivery (sent automatically after receiving message_received). */
+  const ackDelivered = useCallback(
+    (conversationId: string, messageId: string): boolean => {
+      return sendRaw({ event: 'message_delivered', data: { conversationId, messageId } });
+    },
+    [sendRaw],
+  );
+
+  /** Mark all messages in a conversation as read (triggers blue tick). */
+  const markAsRead = useCallback(
+    (conversationId: string, lastReadMessageId: string): boolean => {
+      return sendRaw({ event: 'mark_read', data: { conversationId, lastReadMessageId } });
+    },
+    [sendRaw],
+  );
 
   return {
     isConnected,
     incomingMessage,
     sendMessage,
+    ackDelivered,
+    markAsRead,
   };
 };

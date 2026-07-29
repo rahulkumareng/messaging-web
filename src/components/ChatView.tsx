@@ -152,17 +152,22 @@ const ChatView: React.FC<ChatViewProps> = ({
                   <span className="message-sender">{msg.senderEmail}</span>
                 )}
                 <div className="message-bubble">{msg.content}</div>
-                <div className="message-meta">
-                  {msg.createdAt &&
-                    new Date(msg.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                <div style={{ fontSize: '10px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', color: '#8a8d91' }}>
+                  {msg.createdAt && new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   {isMe && msg.status && (
-                    <span className="message-status">
-                      {msg.status === 'sending' && ' 🕒'}
-                      {msg.status === 'sent' && ' ✓'}
-                      {msg.status === 'delivered' && ' ✓✓'}
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      {msg.status === 'sending' && (
+                        <span title="Sending" style={{ color: '#8a8d91' }}>🕒</span>
+                      )}
+                      {msg.status === 'sent' && (
+                        <span title="Sent" style={{ color: '#8a8d91', fontWeight: 'bold' }}>✓</span>
+                      )}
+                      {msg.status === 'delivered' && (
+                        <span title="Delivered" style={{ color: '#8a8d91', fontWeight: 'bold', letterSpacing: '-2px' }}>✓✓</span>
+                      )}
+                      {msg.status === 'read' && (
+                        <span title="Read" style={{ color: '#0084ff', fontWeight: 'bold', letterSpacing: '-2px' }}>✓✓</span>
+                      )}
                     </span>
                   )}
                 </div>

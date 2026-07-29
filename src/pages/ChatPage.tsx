@@ -25,7 +25,7 @@ const ChatPage: React.FC = () => {
   const email = localStorage.getItem('email') || '';
   const currentUserId = localStorage.getItem('userId');
 
-  const { isConnected, incomingMessage, sendMessage } = useChatSocket(token);
+  const { isConnected, incomingMessage, sendMessage, ackDelivered, markAsRead } = useChatSocket(token);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -110,10 +110,9 @@ const ChatPage: React.FC = () => {
         return { ...prev, [data.conversationId]: updated };
       });
     } else if (event === 'message_received') {
-      // Incoming message from another user
+      // Incoming message: append, then auto-ACK delivery
       setMessagesMap(prev => {
         const convMessages = prev[data.conversationId] || [];
-        // Avoid duplicate rendering
         if (convMessages.some(m => m.id === data.messageId)) return prev;
 
         const senderParticipant = conversations
@@ -123,20 +122,43 @@ const ChatPage: React.FC = () => {
         const newMsg: ChatMessageItem = {
           id: data.messageId || `msg-${Date.now()}`,
           conversationId: data.conversationId,
-          senderId: data.senderId,
+          senderId: data.senderId ?? '',
           senderEmail: senderParticipant?.email,
           content: data.content,
           createdAt: data.createdAt || new Date().toISOString(),
           status: 'delivered',
         };
 
-        return {
-          ...prev,
-          [data.conversationId]: [...convMessages, newMsg],
-        };
+        return { ...prev, [data.conversationId]: [...convMessages, newMsg] };
+      });
+
+      // Auto-ACK: send delivery receipt back to gateway
+      if (data.messageId) {
+        ackDelivered(data.conversationId, data.messageId);
+      }
+
+      // If this conversation is currently open, auto mark as read
+      if (activeConversation?.id === data.conversationId && data.messageId) {
+        markAsRead(data.conversationId, data.messageId);
+      }
+    } else if (event === 'message_delivered') {
+      // Remote delivery receipt: update all messages in this conversation to 'delivered'
+      setMessagesMap(prev => {
+        const convMessages = prev[data.conversationId] || [];
+        const updated = convMessages.map(m =>
+          m.status === 'sent' ? { ...m, status: 'delivered' as const } : m
+        );
+        return { ...prev, [data.conversationId]: updated };
+      });
+    } else if (event === 'message_read') {
+      // Blue tick: update all messages up to lastReadMessageId to 'read'
+      setMessagesMap(prev => {
+        const convMessages = prev[data.conversationId] || [];
+        const updated = convMessages.map(m => ({ ...m, status: 'read' as const }));
+        return { ...prev, [data.conversationId]: updated };
       });
     }
-  }, [incomingMessage, conversations]);
+  }, [incomingMessage, conversations, activeConversation, ackDelivered, markAsRead]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -147,6 +169,15 @@ const ChatPage: React.FC = () => {
 
   const handleSelectConversation = (conversation: Conversation) => {
     setActiveConversation(conversation);
+
+    // Auto mark-read: mark the latest message as read when switching conversations
+    const msgs = messagesMap[conversation.id];
+    if (msgs && msgs.length > 0) {
+      const lastMsg = msgs[msgs.length - 1];
+      if (lastMsg.senderId !== currentUserId && lastMsg.id) {
+        markAsRead(conversation.id, lastMsg.id);
+      }
+    }
   };
 
   const handleSendMessage = (content: string) => {
