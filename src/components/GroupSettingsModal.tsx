@@ -1,7 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Alert, Badge, Box, Button, Field, Flex, Input, Text, VStack } from '@chakra-ui/react';
+import AppDialog from './AppDialog';
 import AvatarInitials from './AvatarInitials';
-import { usersApi, conversationsApi, getErrorMessage } from '../api/client';
+import { UserSearchField } from './UserSearchField';
+import { SelectedUserChips } from './SelectedUserChips';
+import { PrimaryButton } from './PrimaryButton';
+import { conversationsApi, getErrorMessage } from '../api/client';
 import type { User, Conversation } from '../api/client';
+import { useUserSearch } from '../hooks/useUserSearch';
 
 interface GroupSettingsModalProps {
   isOpen: boolean;
@@ -10,62 +16,37 @@ interface GroupSettingsModalProps {
   conversation: Conversation;
 }
 
-const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({ isOpen, onClose, onSuccess, conversation }) => {
+const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  conversation,
+}) => {
   const [groupName, setGroupName] = useState(conversation.title || '');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
-  const [loadingSearch, setLoadingSearch] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Reset state when modal opens or conversation changes
+  // Reset state when modal opens or conversation changes.
   useEffect(() => {
     if (isOpen) {
       setGroupName(conversation.title || '');
       setSearchQuery('');
-      setSearchResults([]);
       setSelectedUsers([]);
       setError('');
     }
   }, [isOpen, conversation]);
 
-  // Debounced search
-  useEffect(() => {
-    if (searchQuery.length < 2) {
-      setSearchResults([]);
-      return;
-    }
+  // Exclude already-existing participants AND just-added ones from the search.
+  const existingIds = new Set(conversation.participants.map((p) => p.userId));
+  const selectedIds = new Set(selectedUsers.map((u) => u.id));
+  const excluding = new Set([...existingIds, ...selectedIds]);
+  const { results, loading } = useUserSearch(searchQuery, excluding);
 
-    const timer = setTimeout(async () => {
-      setLoadingSearch(true);
-      try {
-        const res = await usersApi.search(searchQuery);
-        // Filter out already selected users and users already in the group
-        const selectedIds = new Set(selectedUsers.map(u => u.id));
-        const existingParticipantIds = new Set(conversation.participants.map(p => p.userId));
-        
-        setSearchResults(res.data.filter(u => !selectedIds.has(u.id) && !existingParticipantIds.has(u.id)));
-      } catch (err) {
-        console.error('Failed to search users:', err);
-      } finally {
-        setLoadingSearch(false);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedUsers, conversation.participants]);
-
-  if (!isOpen) return null;
-
-  const handleAddUser = (user: User) => {
-    setSelectedUsers([...selectedUsers, user]);
-    setSearchResults(searchResults.filter(u => u.id !== user.id));
+  const handleAdd = (user: User) => {
+    setSelectedUsers((prev) => [...prev, user]);
     setSearchQuery('');
-  };
-
-  const handleRemoveUser = (userId: string) => {
-    setSelectedUsers(selectedUsers.filter(u => u.id !== userId));
   };
 
   const handleSave = async () => {
@@ -73,124 +54,122 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({ isOpen, onClose
       setError('Group name cannot be empty.');
       return;
     }
-
     setError('');
     setSaving(true);
-
     try {
-      // If title changed, update it
       if (groupName.trim() !== conversation.title) {
         await conversationsApi.updateTitle(conversation.id, groupName.trim());
       }
-      
-      // If new participants added, update them
       if (selectedUsers.length > 0) {
-        const participantIds = selectedUsers.map(u => u.id);
-        await conversationsApi.addParticipants(conversation.id, participantIds);
+        await conversationsApi.addParticipants(
+          conversation.id,
+          selectedUsers.map((u) => u.id),
+        );
       }
-
       onSuccess();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to update group. Please try again.'));
     } finally {
       setSaving(false);
     }
   };
 
+  const titleDirty = groupName.trim() !== conversation.title;
+  const hasChanges = titleDirty || selectedUsers.length > 0;
+
   return (
-    <div className="modal-overlay animate-fade-in">
-      <div className="modal-content animate-fade-in-up">
-        <div className="modal-header">
-          <h2>Group Settings</h2>
-          <button className="btn-close" onClick={onClose}>&times;</button>
-        </div>
-
-        <div className="modal-body">
-          {error && <div className="error-message">{error}</div>}
-
-          <div className="form-group">
-            <label>Group Name</label>
-            <input
-              type="text"
-              className="form-input"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Add New Participants</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Search by email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          {loadingSearch && <div className="search-loading">Searching...</div>}
-
-          {searchResults.length > 0 && (
-            <div className="search-results">
-              {searchResults.map(user => (
-                <div key={user.id} className="search-result-item">
-                  <div className="user-info-row">
-                    <AvatarInitials name={user.email} size="small" />
-                    <span>{user.email}</span>
-                  </div>
-                  <button className="btn-add" onClick={() => handleAddUser(user)}>Add</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {selectedUsers.length > 0 && (
-            <div className="selected-users">
-              <label>Users to Add ({selectedUsers.length})</label>
-              <div className="selected-list">
-                {selectedUsers.map(user => (
-                  <div key={user.id} className="selected-badge">
-                    <span>{user.email.split('@')[0]}</span>
-                    <button onClick={() => handleRemoveUser(user.id)}>&times;</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="current-participants" style={{ marginTop: '24px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '12px', display: 'block' }}>
-              Current Participants ({conversation.participants.length})
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {conversation.participants.map(p => (
-                <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <AvatarInitials name={p.email} size="small" />
-                  <span style={{ fontSize: '14px' }}>{p.email}</span>
-                  {p.role === 'admin' && (
-                    <span style={{ fontSize: '11px', background: 'rgba(108, 99, 255, 0.15)', color: 'var(--accent-secondary)', padding: '2px 6px', borderRadius: '4px' }}>
-                      Admin
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn-cancel" onClick={onClose}>Cancel</button>
-          <button
-            className="btn-primary"
+    <AppDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Group Settings"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <PrimaryButton
             onClick={handleSave}
-            disabled={saving || (!groupName.trim() && selectedUsers.length === 0) || (groupName.trim() === conversation.title && selectedUsers.length === 0)}
+            loading={saving}
+            loadingText="Saving..."
+            disabled={!hasChanges}
           >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-    </div>
+            Save Changes
+          </PrimaryButton>
+        </>
+      }
+    >
+      {error && (
+        <Alert.Root status="error" mb={4}>
+          <Alert.Indicator />
+          <Alert.Title>{error}</Alert.Title>
+        </Alert.Root>
+      )}
+
+      <Field.Root mb={4}>
+        <Field.Label
+          textTransform="uppercase"
+          fontSize="xs"
+          letterSpacing="0.5px"
+          fontWeight="medium"
+          color="text.secondary"
+        >
+          Group Name
+        </Field.Label>
+        <Input
+          type="text"
+          colorPalette="brand"
+          bg="bg.raised"
+          _placeholder={{ color: 'text.muted' }}
+          borderColor={{ base: 'border.subtle', _dark: 'border.strong' }}
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+        />
+      </Field.Root>
+
+      <Field.Root mb={4}>
+        <UserSearchField
+          label="Add New Participants"
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          results={results}
+          loading={loading}
+          actionLabel="Add"
+          onSelect={handleAdd}
+        />
+      </Field.Root>
+
+      <SelectedUserChips
+        users={selectedUsers}
+        onRemove={(id) => setSelectedUsers((prev) => prev.filter((u) => u.id !== id))}
+        label={`Users to Add (${selectedUsers.length})`}
+      />
+
+      <Box mt={6}>
+        <Text fontSize="xs" fontWeight="medium" color="text.secondary" mb={3}>
+          Current Participants ({conversation.participants.length})
+        </Text>
+        <VStack align="stretch" gap={2}>
+          {conversation.participants.map((p) => (
+            <Flex key={p.userId} align="center" gap={2.5}>
+              <AvatarInitials name={p.email} size="small" />
+              <Text fontSize="sm" minW="0" truncate>
+                {p.email}
+              </Text>
+              {p.role === 'admin' && (
+                <Badge
+                  colorPalette="warm"
+                  variant="subtle"
+                  fontSize="xs"
+                  color={{ base: 'warm.800', _dark: 'warm.200' }}
+                >
+                  Admin
+                </Badge>
+              )}
+            </Flex>
+          ))}
+        </VStack>
+      </Box>
+    </AppDialog>
   );
 };
 

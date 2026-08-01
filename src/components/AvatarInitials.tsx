@@ -1,24 +1,33 @@
-import React from 'react';
+import { Avatar } from '@chakra-ui/react';
+
+/**
+ * Identity avatar: hashes the name onto one of ten desaturated tones, renders
+ * the initials on a rounded-square "sticker" tile with a chunky ink border and
+ * a tiny per-identity rotation. Desaturated moderately (2026-08-02) — enough
+ * that they sit quietly beside the graphite+amber system, but each keeps its
+ * hue and varies in lightness so tiles stay distinguishable (sat 18–48%, not
+ * muddy gray). All clear white text ≥4.5:1 in both themes.
+ */
 
 const AVATAR_COLORS = [
-  'linear-gradient(135deg, #6c63ff, #a78bfa)',
-  'linear-gradient(135deg, #f472b6, #ec4899)',
-  'linear-gradient(135deg, #34d399, #10b981)',
-  'linear-gradient(135deg, #fbbf24, #f59e0b)',
-  'linear-gradient(135deg, #60a5fa, #3b82f6)',
-  'linear-gradient(135deg, #f87171, #ef4444)',
-  'linear-gradient(135deg, #a78bfa, #8b5cf6)',
-  'linear-gradient(135deg, #2dd4bf, #14b8a6)',
-  'linear-gradient(135deg, #fb923c, #f97316)',
-  'linear-gradient(135deg, #818cf8, #6366f1)',
+  '#4e59a8', // indigo
+  '#985f7d', // rose
+  '#2f7d76', // teal
+  '#8a6f35', // ochre
+  '#3f6f9e', // sky
+  '#9c6158', // clay
+  '#6d5fa8', // plum
+  '#2f7d63', // mint
+  '#8a6330', // rust
+  '#55627a', // slate
 ];
 
-function getColorIndex(str: string): number {
+function getHash(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return Math.abs(hash) % AVATAR_COLORS.length;
+  return Math.abs(hash);
 }
 
 function getInitials(name: string): string {
@@ -29,23 +38,39 @@ function getInitials(name: string): string {
   return name.charAt(0).toUpperCase();
 }
 
+const SIZE_MAP = {
+  small: 'sm',
+  medium: 'md',
+  large: 'lg',
+} as const;
+
 interface AvatarInitialsProps {
   name: string;
   size?: 'small' | 'medium' | 'large';
 }
 
 const AvatarInitials: React.FC<AvatarInitialsProps> = ({ name, size = 'medium' }) => {
-  const colorIndex = getColorIndex(name);
+  const hash = getHash(name);
+  const colorIndex = hash % AVATAR_COLORS.length;
+  // Slight per-identity tilt (−3°..+3°) on SMALL tiles only — a sticker quirk
+  // at list size, noise at header size.
+  const rotation = size === 'small' ? (hash % 7) - 3 : 0;
   const initials = getInitials(name);
-  const sizeClass = size !== 'medium' ? size : '';
 
   return (
-    <div
-      className={`avatar-initials ${sizeClass}`}
-      style={{ background: AVATAR_COLORS[colorIndex] }}
+    <Avatar.Root
+      size={SIZE_MAP[size]}
+      bg={AVATAR_COLORS[colorIndex]}
+      color="white"
+      fontWeight="700"
+      borderRadius="lg"
+      border="2px solid"
+      borderColor="border.ink"
+      transform={`rotate(${rotation}deg)`}
+      flexShrink="0"
     >
-      {initials}
-    </div>
+      <Avatar.Fallback>{initials}</Avatar.Fallback>
+    </Avatar.Root>
   );
 };
 

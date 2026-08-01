@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Alert, Box, Button, Field, Flex, Heading, Input, Text } from '@chakra-ui/react';
+import { AppLink } from '../components/AppLink';
+import { ThemeToggle } from '../components/ThemeMode';
+import { BoltIcon } from '../components/icons';
 import { authApi, getErrorMessage } from '../api/client';
 
 const RegisterPage: React.FC = () => {
@@ -43,34 +47,77 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>Create account</h1>
-        <p className="subtitle">Join Messenger and start chatting</p>
+    <Flex
+      minH="100dvh"
+      align="center"
+      justify="center"
+      position="relative"
+      bg="bg.canvas"
+      px={4}
+    >
+      <Box position="absolute" top={4} right={4}>
+        <ThemeToggle />
+      </Box>
 
-        {error && <div className="error-message">{error}</div>}
+      <Box layerStyle="card" w="full" maxW="400px" p={10} animation="fade-in-up 400ms ease-out">
+        <Flex justify="center" mb={4}>
+          <BoltIcon boxSize={14} />
+        </Flex>
+        <Heading as="h1" fontSize="2xl" fontWeight="700" fontFamily="display" mb={1.5} textAlign="center">
+          Create account
+        </Heading>
+        <Text color="text.secondary" fontSize="sm" mb={8}>
+          Join Messenger and start chatting
+        </Text>
+
+        {error && (
+          <Alert.Root status="error" mb={5}>
+            <Alert.Indicator />
+            <Alert.Title>{error}</Alert.Title>
+          </Alert.Root>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
+          <Field.Root mb={5}>
+            <Field.Label
+              fontSize="xs"
+              fontWeight="medium"
+              color="text.secondary"
+              mb={1.5}
+            >
+              Email
+            </Field.Label>
+            <Input
               id="email"
               type="email"
-              className="form-input"
+              colorPalette="brand"
+              bg="bg.raised"
+              borderColor="border.subtle"
+              _placeholder={{ color: 'text.muted' }}
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
             />
-          </div>
+          </Field.Root>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
+          <Field.Root mb={5}>
+            <Field.Label
+              fontSize="xs"
+              fontWeight="medium"
+              color="text.secondary"
+              mb={1.5}
+            >
+              Password
+            </Field.Label>
+            <Input
               id="password"
               type="password"
-              className="form-input"
+              colorPalette="brand"
+              bg="bg.raised"
+              borderColor="border.subtle"
+              _placeholder={{ color: 'text.muted' }}
               placeholder="Minimum 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -78,36 +125,55 @@ const RegisterPage: React.FC = () => {
               minLength={8}
               maxLength={72}
             />
-          </div>
+          </Field.Root>
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
+          <Field.Root mb={6}>
+            <Field.Label
+              fontSize="xs"
+              fontWeight="medium"
+              color="text.secondary"
+              mb={1.5}
+            >
+              Confirm Password
+            </Field.Label>
+            <Input
               id="confirmPassword"
               type="password"
-              className="form-input"
+              colorPalette="brand"
+              bg="bg.raised"
+              borderColor="border.subtle"
+              _placeholder={{ color: 'text.muted' }}
               placeholder="Re-enter your password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               maxLength={72}
             />
-          </div>
+          </Field.Root>
 
-          <button
+          <Button
             type="submit"
-            className="btn-primary"
-            disabled={loading || !email || !password || !confirmPassword}
+            w="full"
+            bg="accent.solid"
+            color="text.inverse"
+            _hover={{ bg: 'accent.hover' }}
+            cartoon
+            loading={loading}
+            loadingText="Creating account..."
+            disabled={!email || !password || !confirmPassword}
           >
-            {loading ? 'Creating account...' : 'Create Account'}
-          </button>
+            Create Account
+          </Button>
         </form>
 
-        <div className="auth-link">
-          Already have an account? <Link to="/login">Sign in</Link>
-        </div>
-      </div>
-    </div>
+        <Text textAlign="center" mt={6} fontSize="sm" color="text.secondary">
+          Already have an account?{' '}
+          <AppLink to="/login" color="accent.text" fontWeight="medium" _hover={{ textDecoration: 'underline' }}>
+            Sign in
+          </AppLink>
+        </Text>
+      </Box>
+    </Flex>
   );
 };
 

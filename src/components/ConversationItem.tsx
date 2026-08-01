@@ -1,34 +1,26 @@
 import React from 'react';
+import { Box, Flex, Text, VStack } from '@chakra-ui/react';
 import AvatarInitials from './AvatarInitials';
+import { UsersIcon } from './icons';
+import { formatTime } from '../utils/format';
 import type { Conversation } from '../api/client';
 
 interface ConversationItemProps {
   conversation: Conversation;
   isActive: boolean;
   onClick: () => void;
-}
-
-function formatTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (diffDays === 1) {
-    return 'Yesterday';
-  } else if (diffDays < 7) {
-    return date.toLocaleDateString([], { weekday: 'short' });
-  } else {
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  }
+  /** Last-message preview text (null/undefined → "No messages yet"). */
+  preview?: string | null;
+  /** Honest unread dot: newest message is incoming and newer than my read watermark. */
+  unread?: boolean;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   isActive,
   onClick,
+  preview,
+  unread,
 }) => {
   const currentUserId = localStorage.getItem('userId');
 
@@ -44,20 +36,59 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     'Unknown';
 
   return (
-    <div
-      className={`conversation-item ${isActive ? 'active' : ''}`}
+    <Box
+      as="button"
+      w="full"
+      textAlign="start"
+      display="flex"
+      alignItems="center"
+      gap={3.5}
+      p={3}
+      borderRadius="lg"
+      border="2px solid"
+      borderColor={isActive ? 'border.accent' : 'transparent'}
+      boxShadow={isActive ? 'offset' : undefined}
+      cursor="pointer"
+      position="relative"
+      bg={isActive ? 'bg.active' : undefined}
+      _hover={{
+        bg: isActive ? 'bg.active' : 'bg.hover',
+        borderColor: isActive ? 'border.accent' : 'border.strong',
+      }}
+      aria-current={isActive ? 'true' : undefined}
       onClick={onClick}
     >
+      {/* Amber "you are here" marker — the active row is the live one. */}
+      {isActive && (
+        <Box
+          position="absolute"
+          left="0"
+          top="14%"
+          bottom="14%"
+          w="3px"
+          borderRadius="full"
+          bg="warm.text"
+        />
+      )}
       <AvatarInitials name={displayName} />
-      <div className="conv-info">
-        <div className="conv-title">{displayName}</div>
-        <div className="conv-preview">No messages yet</div>
-      </div>
-      <div className="conv-meta">
-        <span className="conv-time">{formatTime(conversation.updatedAt)}</span>
-        <span className="conv-badge">{conversation.type}</span>
-      </div>
-    </div>
+      <Flex direction="column" flex="1" minW="0" align="flex-start">
+        <Text fontWeight={unread ? 'bold' : 'semibold'} fontSize="sm" truncate>
+          {displayName}
+        </Text>
+        <Text fontSize="sm" color="text.secondary" truncate>
+          {preview || 'No messages yet'}
+        </Text>
+      </Flex>
+      <VStack align="flex-end" gap={1.5} flexShrink="0">
+        <Text fontSize="xs" color="text.secondary">
+          {formatTime(conversation.updatedAt)}
+        </Text>
+        <Flex align="center" gap={1.5} minH="14px">
+          {unread && <Box boxSize="8px" borderRadius="full" bg="warm.solid" border="1.5px solid" borderColor="border.ink" />}
+          {conversation.type === 'group' && <UsersIcon boxSize="12px" color="text.secondary" />}
+        </Flex>
+      </VStack>
+    </Box>
   );
 };
 

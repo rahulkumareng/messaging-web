@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Alert, Box, Button, Field, Flex, Heading, Input, Text } from '@chakra-ui/react';
+import { AppLink } from '../components/AppLink';
+import { ThemeToggle } from '../components/ThemeMode';
+import { BoltIcon } from '../components/icons';
 import { authApi, getErrorMessage } from '../api/client';
 
 const LoginPage: React.FC = () => {
@@ -31,55 +35,107 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>Welcome back</h1>
-        <p className="subtitle">Sign in to continue to Messenger</p>
+    <Flex
+      minH="100dvh"
+      align="center"
+      justify="center"
+      position="relative"
+      bg="bg.canvas"
+      px={4}
+    >
+      <Box position="absolute" top={4} right={4}>
+        <ThemeToggle />
+      </Box>
 
-        {error && <div className="error-message">{error}</div>}
+      <Box layerStyle="card" w="full" maxW="400px" p={10} animation="fade-in-up 400ms ease-out">
+        <Flex justify="center" mb={4}>
+          <BoltIcon boxSize={14} />
+        </Flex>
+        <Heading as="h1" fontSize="2xl" fontWeight="700" fontFamily="display" mb={1.5} textAlign="center">
+          Welcome back
+        </Heading>
+        <Text color="text.secondary" fontSize="sm" mb={8}>
+          Sign in to continue to Messenger
+        </Text>
+
+        {error && (
+          <Alert.Root status="error" mb={5}>
+            <Alert.Indicator />
+            <Alert.Title>{error}</Alert.Title>
+          </Alert.Root>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
+          <Field.Root mb={5}>
+            <Field.Label
+              fontSize="xs"
+              fontWeight="medium"
+              color="text.secondary"
+              mb={1.5}
+            >
+              Email
+            </Field.Label>
+            <Input
               id="email"
               type="email"
-              className="form-input"
+              colorPalette="brand"
+              bg="bg.raised"
+              borderColor="border.subtle"
+              _placeholder={{ color: 'text.muted' }}
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
             />
-          </div>
+          </Field.Root>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
+          <Field.Root mb={6}>
+            <Field.Label
+              fontSize="xs"
+              fontWeight="medium"
+              color="text.secondary"
+              mb={1.5}
+            >
+              Password
+            </Field.Label>
+            <Input
               id="password"
               type="password"
-              className="form-input"
+              colorPalette="brand"
+              bg="bg.raised"
+              borderColor="border.subtle"
+              _placeholder={{ color: 'text.muted' }}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-          </div>
+          </Field.Root>
 
-          <button
+          <Button
             type="submit"
-            className="btn-primary"
-            disabled={loading || !email || !password}
+            w="full"
+            bg="accent.solid"
+            color="text.inverse"
+            _hover={{ bg: 'accent.hover' }}
+            cartoon
+            loading={loading}
+            loadingText="Signing in..."
+            disabled={!email || !password}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
+            Sign In
+          </Button>
         </form>
 
-        <div className="auth-link">
-          Don't have an account? <Link to="/register">Create one</Link>
-        </div>
-      </div>
-    </div>
+        <Text textAlign="center" mt={6} fontSize="sm" color="text.secondary">
+          Don't have an account?{' '}
+          <AppLink to="/register" color="accent.text" fontWeight="medium" _hover={{ textDecoration: 'underline' }}>
+            Create one
+          </AppLink>
+        </Text>
+      </Box>
+    </Flex>
   );
 };
 
