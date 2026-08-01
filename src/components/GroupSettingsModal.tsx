@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AvatarInitials from './AvatarInitials';
-import { usersApi, conversationsApi } from '../api/client';
+import { usersApi, conversationsApi, getErrorMessage } from '../api/client';
 import type { User, Conversation } from '../api/client';
 
 interface GroupSettingsModalProps {
@@ -91,7 +91,7 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({ isOpen, onClose
 
       onSuccess();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update group. Please try again.');
+      setError(getErrorMessage(err, 'Failed to update group. Please try again.'));
     } finally {
       setSaving(false);
     }

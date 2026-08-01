@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AvatarInitials from './AvatarInitials';
-import { usersApi, conversationsApi } from '../api/client';
+import { usersApi, conversationsApi, getErrorMessage } from '../api/client';
 import type { User } from '../api/client';
 
 interface CreateGroupModalProps {
@@ -78,7 +78,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onClose, on
       setSelectedUsers([]);
       onSuccess();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create group. Please try again.');
+      setError(getErrorMessage(err, 'Failed to create group. Please try again.'));
     } finally {
       setCreating(false);
     }

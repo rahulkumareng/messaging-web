@@ -30,7 +30,18 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   isActive,
   onClick,
 }) => {
-  const displayName = conversation.title || conversation.participants[0]?.email || 'Unknown';
+  const currentUserId = localStorage.getItem('userId');
+
+  // For direct chats the label must be the OTHER participant — participants[0]
+  // is just whatever row came first and is often the current user's own email,
+  // which makes different conversations look identical in the list.
+  const otherParticipant = conversation.participants.find((p) => p.userId !== currentUserId);
+  const displayName =
+    conversation.title ||
+    (conversation.type === 'direct'
+      ? otherParticipant?.email
+      : conversation.participants[0]?.email) ||
+    'Unknown';
 
   return (
     <div

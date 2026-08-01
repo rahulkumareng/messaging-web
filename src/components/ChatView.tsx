@@ -14,6 +14,8 @@ interface ChatViewProps {
   messages: ChatMessageItem[];
   onSendMessage: (content: string) => void;
   isConnected: boolean;
+  /** Transient notice to show above the input bar (e.g. message failed to send). */
+  notice?: string | null;
 }
 
 const ChatView: React.FC<ChatViewProps> = ({
@@ -22,6 +24,7 @@ const ChatView: React.FC<ChatViewProps> = ({
   messages,
   onSendMessage,
   isConnected,
+  notice,
 }) => {
   const [text, setText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -50,7 +53,15 @@ const ChatView: React.FC<ChatViewProps> = ({
     .map((p) => p.email)
     .join(', ');
 
-  const displayName = conversation.title || participantEmails;
+  // Direct chats: label with the other participant, not all emails joined
+  // (same self-label pitfall as the sidebar list).
+  const otherParticipant = conversation.participants.find(
+    (p) => p.email !== currentUserEmail,
+  );
+  const displayName =
+    conversation.title ||
+    (conversation.type === 'direct' && otherParticipant?.email) ||
+    participantEmails;
   const isAdmin =
     conversation.type === 'group' &&
     conversation.participants.find((p) => p.email === currentUserEmail)?.role === 'admin';
@@ -155,19 +166,21 @@ const ChatView: React.FC<ChatViewProps> = ({
                 <div style={{ fontSize: '10px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', color: '#8a8d91' }}>
                   {msg.createdAt && new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   {isMe && msg.status && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                      {msg.status === 'sending' && (
-                        <span title="Sending" style={{ color: '#8a8d91' }}>🕒</span>
-                      )}
-                      {msg.status === 'sent' && (
-                        <span title="Sent" style={{ color: '#8a8d91', fontWeight: 'bold' }}>✓</span>
-                      )}
-                      {msg.status === 'delivered' && (
-                        <span title="Delivered" style={{ color: '#8a8d91', fontWeight: 'bold', letterSpacing: '-2px' }}>✓✓</span>
-                      )}
-                      {msg.status === 'read' && (
-                        <span title="Read" style={{ color: '#0084ff', fontWeight: 'bold', letterSpacing: '-2px' }}>✓✓</span>
-                      )}
+                    <span
+                      className="message-status"
+                      style={
+                        msg.status === 'failed'
+                          ? { color: '#ea4335' }
+                          : msg.status === 'read'
+                            ? { color: '#0084ff' }
+                            : undefined
+                      }
+                    >
+                      {msg.status === 'sending' && ' 🕒'}
+                      {msg.status === 'sent' && ' ✓'}
+                      {msg.status === 'delivered' && ' ✓✓'}
+                      {msg.status === 'read' && ' ✓✓'}
+                      {msg.status === 'failed' && ' ✕'}
                     </span>
                   )}
                 </div>
@@ -180,6 +193,20 @@ const ChatView: React.FC<ChatViewProps> = ({
 
       {/* Input Bar */}
       <form className="chat-input-bar" onSubmit={handleSend}>
+        {notice && (
+          <div
+            className="chat-notice"
+            style={{
+              padding: '8px 16px',
+              fontSize: '13px',
+              color: '#ea4335',
+              background: 'rgba(234, 67, 53, 0.12)',
+              borderTop: '1px solid rgba(234, 67, 53, 0.25)',
+            }}
+          >
+            {notice}
+          </div>
+        )}
         <div className="chat-input-wrapper">
           <input
             type="text"
@@ -190,6 +217,7 @@ const ChatView: React.FC<ChatViewProps> = ({
             value={text}
             onChange={(e) => setText(e.target.value)}
             disabled={!isConnected}
+            maxLength={4000}
           />
           <button
             className="btn-send"

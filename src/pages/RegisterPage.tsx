@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authApi } from '../api/client';
+import { authApi, getErrorMessage } from '../api/client';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,9 +36,7 @@ const RegisterPage: React.FC = () => {
 
       navigate('/chat', { replace: true });
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || 'Registration failed. Please try again.';
-      setError(message);
+      setError(getErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -78,6 +76,7 @@ const RegisterPage: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
+              maxLength={72}
             />
           </div>
 
@@ -91,6 +90,7 @@ const RegisterPage: React.FC = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
+              maxLength={72}
             />
           </div>
 

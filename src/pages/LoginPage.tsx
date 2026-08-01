@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authApi } from '../api/client';
+import { authApi, getErrorMessage } from '../api/client';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -24,9 +24,7 @@ const LoginPage: React.FC = () => {
 
       navigate('/chat', { replace: true });
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || 'Invalid credentials. Please try again.';
-      setError(message);
+      setError(getErrorMessage(err, 'Invalid credentials. Please try again.'));
     } finally {
       setLoading(false);
     }

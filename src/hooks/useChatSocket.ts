@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface WSMessageData {
   messageId?: string;
@@ -19,9 +19,17 @@ export interface WSMessageData {
   deliveredCount?: number;
 }
 
+/** Server-sent error frames: { event: 'error', data: { code, message, clientMessageId?, conversationId? } } */
+export interface WSErrorData {
+  code?: string;
+  message?: string;
+  clientMessageId?: string;
+  conversationId?: string;
+}
+
 interface WSFrame {
   event: string;
-  data: WSMessageData;
+  data: WSMessageData | WSErrorData;
 }
 
 export const useChatSocket = (token: string | null) => {
@@ -65,6 +73,14 @@ export const useChatSocket = (token: string | null) => {
     ws.onclose = (event) => {
       console.log('🔌 WebSocket Disconnected:', event.reason);
       setIsConnected(false);
+      // 1008 = rejected at the handshake (missing/invalid/expired token).
+      // Session is dead — bounce to login like the REST 401 interceptor does.
+      if (event.code === 1008) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('email');
+        window.location.href = '/login';
+      }
     };
 
     return () => {
@@ -90,14 +106,6 @@ export const useChatSocket = (token: string | null) => {
     [sendRaw],
   );
 
-  /** Acknowledge message delivery (sent automatically after receiving message_received). */
-  const ackDelivered = useCallback(
-    (conversationId: string, messageId: string): boolean => {
-      return sendRaw({ event: 'message_delivered', data: { conversationId, messageId } });
-    },
-    [sendRaw],
-  );
-
   /** Mark all messages in a conversation as read (triggers blue tick). */
   const markAsRead = useCallback(
     (conversationId: string, lastReadMessageId: string): boolean => {
@@ -106,11 +114,24 @@ export const useChatSocket = (token: string | null) => {
     [sendRaw],
   );
 
+  /**
+   * Acknowledge delivery of a received message (triggers the sender's gray ✓✓).
+   * Sent only after the `message_received` frame has actually been processed by
+   * this client — a socket that's open but throttled (e.g. DevTools offline)
+   * never acks, so the sender stays at one tick until genuine delivery.
+   */
+  const ackDelivered = useCallback(
+    (conversationId: string, messageId: string): boolean => {
+      return sendRaw({ event: 'ack_delivered', data: { conversationId, messageId } });
+    },
+    [sendRaw],
+  );
+
   return {
     isConnected,
     incomingMessage,
     sendMessage,
-    ackDelivered,
     markAsRead,
+    ackDelivered,
   };
 };
