@@ -28,7 +28,7 @@ const ChatPage: React.FC = () => {
   const email = localStorage.getItem('email') || '';
   const currentUserId = localStorage.getItem('userId');
 
-  const { isConnected, incomingMessage, sendMessage, markAsRead, ackDelivered } = useChatSocket(token);
+  const { isConnected, incomingMessage, sendMessage, markAsRead, sendMessageDelivered } = useChatSocket(token);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -145,14 +145,23 @@ const ChatPage: React.FC = () => {
         return { ...prev, [msg.conversationId]: updated };
       });
     } else if (event === 'message_delivered') {
-      // Delivery receipt from the gateway: upgrade my outgoing message from
-      // 'sent' to 'delivered' (gray ✓✓). Upgrade-only — a late or reordered
-      // receipt must never downgrade an already-read (blue) message back to gray.
+      // Delivery receipt from the gateway: upgrade MY outgoing message from
+      // 'sending'/'sent' to 'delivered' (gray ✓✓). The broadcast goes to every
+      // participant except the acker, so only my own messages are eligible.
+      // Match by messageId (Kafka mode — the broadcast carries no
+      // clientMessageId) OR clientMessageId (direct-fallback mode, where the
+      // local optimistic row doesn't yet have the server id). Upgrade-only — a
+      // late or reordered receipt must never downgrade an already-read (blue)
+      // message back to gray.
       const msg = data as WSMessageData;
       setMessagesMap(prev => {
         const convMessages = prev[msg.conversationId] || [];
         const updated = convMessages.map(m => {
-          if (m.clientMessageId === msg.clientMessageId && (m.status === 'sending' || m.status === 'sent')) {
+          if (m.senderId !== currentUserId) return m;
+          const isTarget =
+            (msg.messageId && m.id === msg.messageId) ||
+            (msg.clientMessageId && m.clientMessageId === msg.clientMessageId);
+          if (isTarget && (m.status === 'sending' || m.status === 'sent')) {
             return { ...m, status: 'delivered' as const };
           }
           return m;
@@ -191,7 +200,7 @@ const ChatPage: React.FC = () => {
       // the sender's tick can upgrade to delivered. Runs even when the
       // conversation isn't open — delivery ≠ opened/read.
       if (msg.messageId) {
-        ackDelivered(msg.conversationId, msg.messageId);
+        sendMessageDelivered(msg.conversationId, msg.messageId);
       }
 
       // If this conversation is currently open, auto mark as read
@@ -249,7 +258,7 @@ const ChatPage: React.FC = () => {
         window.setTimeout(() => setSendError(null), 6000);
       }
     }
-  }, [incomingMessage, conversations, activeConversation, markAsRead, ackDelivered]);
+  }, [incomingMessage, conversations, activeConversation, markAsRead, sendMessageDelivered]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');

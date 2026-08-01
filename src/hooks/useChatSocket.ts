@@ -119,10 +119,12 @@ export const useChatSocket = (token: string | null) => {
    * Sent only after the `message_received` frame has actually been processed by
    * this client — a socket that's open but throttled (e.g. DevTools offline)
    * never acks, so the sender stays at one tick until genuine delivery.
+   * The gateway listens for this as the client→server `message_delivered` event
+   * (Kafka-first protocol) and the consumer broadcasts the receipt.
    */
-  const ackDelivered = useCallback(
+  const sendMessageDelivered = useCallback(
     (conversationId: string, messageId: string): boolean => {
-      return sendRaw({ event: 'ack_delivered', data: { conversationId, messageId } });
+      return sendRaw({ event: 'message_delivered', data: { conversationId, messageId } });
     },
     [sendRaw],
   );
@@ -132,6 +134,6 @@ export const useChatSocket = (token: string | null) => {
     incomingMessage,
     sendMessage,
     markAsRead,
-    ackDelivered,
+    sendMessageDelivered,
   };
 };
