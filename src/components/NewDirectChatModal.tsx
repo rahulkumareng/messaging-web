@@ -27,7 +27,7 @@ const NewDirectChatModal: React.FC<NewDirectChatModalProps> = ({ isOpen, onClose
     }
   }, [isOpen]);
 
-  const { results, loading } = useUserSearch(searchQuery, []);
+  const { results, isLoading: isSearching } = useUserSearch(searchQuery, []);
 
   const handleStartChat = async (user: User) => {
     setError('');
@@ -65,7 +65,7 @@ const NewDirectChatModal: React.FC<NewDirectChatModalProps> = ({ isOpen, onClose
           query={searchQuery}
           onQueryChange={setSearchQuery}
           results={results}
-          loading={loading}
+          isLoading={isSearching}
           actionLabel="Chat"
           loadingText="Starting..."
           loadingUserId={creatingId}

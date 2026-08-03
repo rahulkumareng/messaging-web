@@ -1,6 +1,6 @@
 /* oxlint-disable react/only-export-components -- context module: provider + hook + toggle are one unit */
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { IconButton } from '@chakra-ui/react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { IconButton, useSafeLayoutEffect } from '@chakra-ui/react';
 import { MoonIcon, SunIcon } from './icons';
 
 /**
@@ -25,8 +25,11 @@ export const ThemeModeProvider = ({ children }: { children: ReactNode }) => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
-  useEffect(() => {
+  useSafeLayoutEffect(() => {
     document.documentElement.classList.toggle('dark', mode === 'dark');
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', mode === 'dark' ? '#0e0e11' : '#f5f5f7');
     localStorage.setItem('theme-mode', mode);
   }, [mode]);
 

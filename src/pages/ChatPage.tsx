@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Flex, useBreakpointValue } from '@chakra-ui/react';
+import { Box, Button, Flex, Text, useBreakpointValue } from '@chakra-ui/react';
 import ConversationList from '../components/ConversationList';
 import ChatView from '../components/ChatView';
 import SidebarHeader from '../components/SidebarHeader';
@@ -14,9 +14,11 @@ import { useChatSocket } from '../hooks/useChatSocket';
 import { useMessages } from '../hooks/useMessages';
 import { usePreviewMap } from '../hooks/usePreviewMap';
 import { useUnreadMap } from '../hooks/useUnreadMap';
-import type { ChatMessageItem } from '../components/ChatView';
+import { MAX_MESSAGE_LENGTH } from '../constants';
+import type { ChatMessageItem } from '../types/messages';
 import { shortEmail } from '../utils/format';
 import { uuidV1Timestamp } from '../utils/uuid';
+import { createOptimisticMessage, newClientMessageId } from '../utils/ws';
 
 /** Sidebar (conversation list) width bounds + default, for the drag resize. */
 const SIDEBAR_DEFAULT = 380;
@@ -27,11 +29,15 @@ const ChatPage: React.FC = () => {
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isDirectModalOpen, setIsDirectModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [conversationsError, setConversationsError] = useState(false);
+  // Tracks the 6s auto-clear for sendError so a newer error supersedes the
+  // pending timer and logout never lets it fire on an unmounted page.
+  const sendErrorTimerRef = useRef<number | null>(null);
 
   const token = localStorage.getItem('token');
   const email = localStorage.getItem('email') || '';
@@ -67,20 +73,45 @@ const ChatPage: React.FC = () => {
   // arrives, so an unstable dep re-triggers the effect → setState → re-render.)
   const lookupParticipant = useCallback(
     (userId: string) =>
-      conversations.flatMap((c) => c.participants).find((p) => p.userId === userId),
+      conversations.flatMap((conversation) => conversation.participants).find((participant) => participant.userId === userId),
     [conversations],
   );
   const handleSocketError = useCallback((message: string) => {
     setSendError(message);
-    window.setTimeout(() => setSendError(null), 6000);
+    // Supersede any pending auto-clear (a newer error owns the next 6s).
+    if (sendErrorTimerRef.current !== null) {
+      window.clearTimeout(sendErrorTimerRef.current);
+    }
+    sendErrorTimerRef.current = window.setTimeout(() => setSendError(null), 6000);
   }, []);
 
-  const { messagesMap, appendOptimistic } = useMessages(
+  // Never let the auto-clear timer fire after logout/unmount.
+  useEffect(
+    () => () => {
+      if (sendErrorTimerRef.current !== null) {
+        window.clearTimeout(sendErrorTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  // useMessages needs a STABLE onMarkRead callback (it's in the frame effect's
+  // deps — an inline arrow would re-fire it every render), but markWatermark
+  // only exists after useUnreadMap runs, and useUnreadMap needs messagesMap
+  // from useMessages — a genuine render-order cycle. Break it with a ref that
+  // useUnreadMap fills in (same latest-value pattern as the hook internals).
+  const markWatermarkRef = useRef<(conversationId: string, messageId: string) => void>(() => {});
+  const handleMarkRead = useCallback((conversationId: string, messageId: string) => {
+    markWatermarkRef.current(conversationId, messageId);
+  }, []);
+
+  const { messagesMap, appendOptimistic, failOptimistic } = useMessages(
     activeConversation,
     currentUserId,
-    { incomingMessage, markAsRead, sendMessageDelivered },
+    { incomingMessage, markAsRead, sendMessageDelivered, isConnected },
     lookupParticipant,
     handleSocketError,
+    handleMarkRead,
   );
 
   const previewMap = usePreviewMap(conversations, messagesMap);
@@ -91,45 +122,50 @@ const ChatPage: React.FC = () => {
     messagesMap,
     previewMap,
   );
+  markWatermarkRef.current = markWatermark;
 
   // ---- Conversations --------------------------------------------------
 
-  const fetchConversations = useCallback(async () => {
+  const handleFetchConversations = useCallback(async () => {
+    setConversationsError(false);
     try {
       const response = await conversationsApi.getAll();
       setConversations(response.data);
 
       setActiveConversation((prev) => {
         if (!prev) return null;
-        const updated = response.data.find((c) => c.id === prev.id);
+        const updated = response.data.find((conversation) => conversation.id === prev.id);
         return updated || prev;
       });
     } catch (err) {
       console.error('Failed to fetch conversations:', err);
+      // Without this the sidebar shows "No conversations yet" and lies —
+      // a failed load is indistinguishable from genuinely having none.
+      setConversationsError(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+    handleFetchConversations();
+  }, [handleFetchConversations]);
 
   // ---- Preview strings for the sidebar -------------------------------
   // In groups, prefix with the sender so you can tell who spoke; in direct
   // chats the identity is implied.
   const previewStrings = useMemo(() => {
-    const result: Record<string, string> = {};
-    for (const conv of conversations) {
-      const last = lastMessageMap[conv.id];
+    const previews: Record<string, string> = {};
+    for (const conversation of conversations) {
+      const last = lastMessageMap[conversation.id];
       if (!last) continue;
       const prefix =
-        conv.type === 'group' && last.senderId !== currentUserId && last.senderEmail
+        conversation.type === 'group' && last.senderId !== currentUserId && last.senderEmail
           ? `${shortEmail(last.senderEmail)}: `
           : '';
-      result[conv.id] = `${prefix}${last.content}`;
+      previews[conversation.id] = `${prefix}${last.content}`;
     }
-    return result;
+    return previews;
   }, [conversations, lastMessageMap, currentUserId]);
 
   // ---- Handlers -------------------------------------------------------
@@ -149,13 +185,13 @@ const ChatPage: React.FC = () => {
     // when switching to an already-loaded conversation. Newest is by timeuuid
     // timestamp, not array position (history order isn't guaranteed). The
     // history-load effect covers the first-open case where the map is empty.
-    const msgs = messagesMap[conversation.id];
-    if (msgs && msgs.length > 0) {
-      const newestIncoming = msgs
-        .filter((m) => m.senderId !== currentUserId)
+    const messages = messagesMap[conversation.id];
+    if (messages && messages.length > 0) {
+      const newestIncoming = messages
+        .filter((message) => message.senderId !== currentUserId)
         .reduce<ChatMessageItem | null>(
-          (newest, m) =>
-            !newest || uuidV1Timestamp(m.id) > uuidV1Timestamp(newest.id) ? m : newest,
+          (newest, message) =>
+            !newest || uuidV1Timestamp(message.id) > uuidV1Timestamp(newest.id) ? message : newest,
           null,
         );
       if (newestIncoming) {
@@ -170,48 +206,50 @@ const ChatPage: React.FC = () => {
   const handleSendMessage = (content: string) => {
     if (!activeConversation) return;
 
-    // Client-side cap so we never hit the server's MaxLength(4000) — the
-    // gateway silently drops oversized frames (no error frame comes back).
-    if (content.length > 4000) {
-      setSendError('Message is too long (max 4000 characters).');
+    // Client-side cap so we never hit the server's MaxLength — the gateway
+    // silently drops oversized frames (no error frame comes back).
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      setSendError(`Message is too long (max ${MAX_MESSAGE_LENGTH} characters).`);
       return;
     }
     setSendError(null);
 
-    const clientMessageId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const clientMessageId = newClientMessageId();
 
     // 1. Optimistically append message locally
-    const optimisticMsg: ChatMessageItem = {
-      id: clientMessageId,
-      clientMessageId,
+    const optimisticMessage = createOptimisticMessage({
       conversationId: activeConversation.id,
+      content,
+      clientMessageId,
       senderId: currentUserId || '',
       senderEmail: email,
-      content,
-      createdAt: new Date().toISOString(),
-      status: 'sending',
-    };
+    });
 
-    appendOptimistic(activeConversation.id, optimisticMsg);
+    appendOptimistic(activeConversation.id, optimisticMessage);
 
-    // 2. Dispatch to WebSocket
-    sendMessage(activeConversation.id, content, clientMessageId);
+    // 2. Dispatch to WebSocket. If the frame never made it onto the socket
+    // (dropped between render and send), fail the row immediately — otherwise
+    // it would sit on 'sending' forever with no error frame and no retry.
+    const sent = sendMessage(activeConversation.id, content, clientMessageId);
+    if (!sent) {
+      failOptimistic(activeConversation.id, clientMessageId);
+    }
   };
 
   const handleGroupCreated = () => {
     setIsGroupModalOpen(false);
-    fetchConversations();
+    handleFetchConversations();
   };
 
   const handleDirectCreated = (conversation: Conversation) => {
     setIsDirectModalOpen(false);
     setActiveConversation(conversation);
-    fetchConversations();
+    handleFetchConversations();
   };
 
   const handleSettingsUpdated = () => {
     setIsSettingsModalOpen(false);
-    fetchConversations();
+    handleFetchConversations();
   };
 
   const activeMessages = activeConversation ? (messagesMap[activeConversation.id] || []) : [];
@@ -236,11 +274,32 @@ const ChatPage: React.FC = () => {
           onLogout={handleLogout}
         />
 
+        {conversationsError && (
+          <Flex
+            role="alert"
+            align="center"
+            justify="space-between"
+            gap={2}
+            px={5}
+            py={2.5}
+            fontSize="sm"
+            color="danger.solid"
+            bg="danger.muted"
+            borderBottom="1px solid"
+            borderColor="danger.border"
+          >
+            <Text>Could not load conversations.</Text>
+            <Button size="xs" variant="ghost" color="danger.solid" onClick={handleFetchConversations}>
+              Retry
+            </Button>
+          </Flex>
+        )}
+
         <ConversationList
           conversations={conversations}
           activeId={activeConversation?.id || null}
           onSelect={handleSelectConversation}
-          loading={loading}
+          isLoading={isLoading}
           previews={previewStrings}
           unread={unreadMap}
           onStartChat={() => setIsDirectModalOpen(true)}

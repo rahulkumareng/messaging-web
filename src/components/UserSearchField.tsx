@@ -13,7 +13,7 @@ interface UserSearchFieldProps {
   query: string;
   onQueryChange: (q: string) => void;
   results: User[];
-  loading: boolean;
+  isLoading: boolean;
   /** What to render in the action slot for each result row ("Add", "Chat"). */
   actionLabel: string;
   /** Called when the user clicks the row's action button. */
@@ -36,7 +36,7 @@ export const UserSearchField = ({
   query,
   onQueryChange,
   results,
-  loading,
+  isLoading,
   actionLabel,
   onSelect,
   disabledUserIds,
@@ -73,13 +73,13 @@ export const UserSearchField = ({
       />
     </InputGroup>
 
-    {loading && (
+    {isLoading && (
       <Text fontSize="sm" color="text.muted" mt={2}>
         Searching...
       </Text>
     )}
 
-    {!loading && query.trim().length >= 2 && results.length === 0 && (
+    {!isLoading && query.trim().length >= 2 && results.length === 0 && (
       <Text fontSize="sm" color="text.secondary" textAlign="center" mt={4}>
         No users found.
       </Text>
@@ -96,7 +96,7 @@ export const UserSearchField = ({
       >
         <Stack gap={0} separator={<Separator />}>
           {results.map((user) => {
-            const disabled = disabledUserIds?.has(user.id) ?? false;
+            const isDisabled = disabledUserIds?.has(user.id) ?? false;
             return (
               <Flex key={user.id} align="center" justify="space-between" p={3} gap={3}>
                 <Flex align="center" gap={3} minW="0">
@@ -109,7 +109,7 @@ export const UserSearchField = ({
                   size="xs"
                   colorScheme="brand"
                   variant="subtle"
-                  disabled={disabled}
+                  disabled={isDisabled}
                   loading={loadingUserId === user.id}
                   loadingText={loadingText}
                   onClick={() => onSelect(user)}

@@ -1,7 +1,8 @@
 /* oxlint-disable react/only-export-components -- every export in this file is an icon component */
 import type { ComponentProps } from 'react';
 import { chakra } from '@chakra-ui/react';
-import type { MessageStatus } from '../hooks/useChatSocket';
+import type { MessageStatus } from '../types/messages';
+import { assertNever } from '../types/messages';
 
 /**
  * Icon set — every icon is a hand-authored inline SVG (chakra.svg): no
@@ -276,6 +277,8 @@ export function MessageStatusIcon({ status, size = 14 }: { status: MessageStatus
     case 'failed':
       return <AlertCircleIcon boxSize={`${size}px`} color="danger.solid" />;
     default:
-      return null;
+      // Exhaustive: a new MessageStatus becomes a compile error here, not a
+      // silent unrendered tick.
+      return assertNever(status);
   }
 }

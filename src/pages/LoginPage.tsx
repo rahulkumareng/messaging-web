@@ -11,7 +11,7 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +27,7 @@ const LoginPage: React.FC = () => {
       localStorage.setItem('email', email);
 
       navigate('/chat', { replace: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(getErrorMessage(err, 'Invalid credentials. Please try again.'));
     } finally {
       setLoading(false);
@@ -120,7 +120,7 @@ const LoginPage: React.FC = () => {
             color="text.inverse"
             _hover={{ bg: 'accent.hover' }}
             cartoon
-            loading={loading}
+            loading={isLoading}
             loadingText="Signing in..."
             disabled={!email || !password}
           >

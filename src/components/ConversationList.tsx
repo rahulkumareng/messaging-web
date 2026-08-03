@@ -8,7 +8,7 @@ interface ConversationListProps {
   conversations: Conversation[];
   activeId: string | null;
   onSelect: (conversation: Conversation) => void;
-  loading: boolean;
+  isLoading: boolean;
   /** Last-message preview text per conversation id. */
   previews?: Record<string, string>;
   /** Unread-dot flag per conversation id. */
@@ -21,7 +21,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   conversations,
   activeId,
   onSelect,
-  loading,
+  isLoading,
   previews,
   unread,
   onStartChat,
@@ -29,13 +29,15 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const [query, setQuery] = useState('');
 
   // Client-side filter over title + participant emails (no backend search).
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return conversations;
+  const filteredConversations = useMemo(() => {
+    const trimmedQuery = query.trim().toLowerCase();
+    if (!trimmedQuery) return conversations;
     return conversations.filter(
-      (c) =>
-        (c.title || '').toLowerCase().includes(q) ||
-        c.participants.some((p) => p.email.toLowerCase().includes(q)),
+      (conversation) =>
+        (conversation.title || '').toLowerCase().includes(trimmedQuery) ||
+        conversation.participants.some((participant) =>
+          participant.email.toLowerCase().includes(trimmedQuery),
+        ),
     );
   }, [conversations, query]);
 
@@ -58,11 +60,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
       </Box>
 
       <Box flex="1" overflowY="auto" px={2} pb={2}>
-        {loading ? (
+        {isLoading ? (
           <Center h="full">
             <Spinner color="brand.400" />
           </Center>
-        ) : filtered.length === 0 ? (
+        ) : filteredConversations.length === 0 ? (
           query.trim() ? (
             <EmptyState.Root>
               <EmptyState.Indicator>
@@ -97,14 +99,14 @@ const ConversationList: React.FC<ConversationListProps> = ({
           )
         ) : (
           <Stack gap={0.5}>
-            {filtered.map((conv) => (
+            {filteredConversations.map((conversation) => (
               <ConversationItem
-                key={conv.id}
-                conversation={conv}
-                isActive={activeId === conv.id}
-                onClick={() => onSelect(conv)}
-                preview={previews?.[conv.id] ?? null}
-                unread={unread?.[conv.id]}
+                key={conversation.id}
+                conversation={conversation}
+                isActive={activeId === conversation.id}
+                onClick={() => onSelect(conversation)}
+                preview={previews?.[conversation.id] ?? null}
+                hasUnread={unread?.[conversation.id]}
               />
             ))}
           </Stack>

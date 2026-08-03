@@ -1,5 +1,5 @@
 /**
- * Pure helpers for shaping message threads.
+ * Pure helpers for shaping a message thread into render rows.
  *
  * The chat view groups consecutive same-sender messages within a short window
  * into clusters (iMessage/WhatsApp convention: one label + one timestamp per
@@ -12,9 +12,7 @@ export const CLUSTER_GAP_MS = 60_000;
 
 /** Minimum shape `buildMessageRows` needs to cluster a thread. The helper is
  * generic over the concrete message type so callers keep every field
- * (senderEmail, content, status, …) on the returned cluster messages.
- * `senderId` is optional because wire frames (`WSMessageData`) mark it
- * optional, though app code coerces it to '' before storing. */
+ * (senderEmail, content, status, …) on the returned cluster messages. */
 export interface ClusterMessage {
   id: string;
   senderId?: string;
@@ -23,13 +21,14 @@ export interface ClusterMessage {
 
 export type MessageRow<T extends ClusterMessage = ClusterMessage> =
   | { kind: 'separator'; key: string; label: string }
-  | { kind: 'cluster'; key: string; msgs: T[] };
+  | { kind: 'cluster'; key: string; messages: T[] };
 
 export interface ClusterOptions {
   /** Override the cluster window (default CLUSTER_GAP_MS). */
   gapMs?: number;
-  /** Format a date for a day separator. */
-  formatDayLabel?: (date: Date) => string;
+  /** Format a date for a day separator. Required: a silent '' default would
+   * render empty day separators, so callers must opt into a label explicitly. */
+  formatDayLabel: (date: Date) => string;
 }
 
 /**
@@ -40,47 +39,43 @@ export interface ClusterOptions {
  */
 export function buildMessageRows<T extends ClusterMessage>(
   messages: readonly T[],
-  opts: ClusterOptions = {},
+  opts: ClusterOptions,
 ): MessageRow<T>[] {
   const gapMs = opts.gapMs ?? CLUSTER_GAP_MS;
-  const formatDayLabel = opts.formatDayLabel ?? defaultDayLabel;
+  const { formatDayLabel } = opts;
   const rows: MessageRow<T>[] = [];
   let lastDay = '';
   let lastCluster: Extract<MessageRow<T>, { kind: 'cluster' }> | null = null;
 
-  for (const msg of messages) {
-    const day = msg.createdAt ? new Date(msg.createdAt).toDateString() : lastDay;
+  for (const message of messages) {
+    const day = message.createdAt ? new Date(message.createdAt).toDateString() : lastDay;
     if (day !== lastDay) {
       rows.push({
         kind: 'separator',
-        key: `sep-${msg.id}`,
-        label: msg.createdAt ? formatDayLabel(new Date(msg.createdAt)) : '',
+        key: `sep-${message.id}`,
+        label: message.createdAt ? formatDayLabel(new Date(message.createdAt)) : '',
       });
       lastDay = day;
       lastCluster = null;
     }
 
-    const prev = lastCluster?.msgs[lastCluster.msgs.length - 1];
+    const prev = lastCluster?.messages[lastCluster.messages.length - 1];
     const prevGap =
-      prev?.createdAt && msg.createdAt
-        ? new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime()
+      prev?.createdAt && message.createdAt
+        ? new Date(message.createdAt).getTime() - new Date(prev.createdAt).getTime()
         : Infinity;
 
-    if (lastCluster && prev && msg.senderId === prev.senderId && prevGap <= gapMs) {
-      lastCluster.msgs.push(msg);
+    if (lastCluster && prev && message.senderId === prev.senderId && prevGap <= gapMs) {
+      lastCluster.messages.push(message);
     } else {
       const cluster: Extract<MessageRow<T>, { kind: 'cluster' }> = {
         kind: 'cluster',
-        key: `cl-${msg.id}`,
-        msgs: [msg],
+        key: `cl-${message.id}`,
+        messages: [message],
       };
       rows.push(cluster);
       lastCluster = cluster;
     }
   }
   return rows;
-}
-
-function defaultDayLabel(): string {
-  return '';
 }

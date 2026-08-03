@@ -18,18 +18,18 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onClose, on
   const [groupName, setGroupName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
-  const [creating, setCreating] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const selectedIds = new Set(selectedUsers.map((u) => u.id));
-  const { results, loading: loadingSearch } = useUserSearch(searchQuery, selectedIds);
+  const selectedIds = new Set(selectedUsers.map((user) => user.id));
+  const { results, isLoading: isSearching } = useUserSearch(searchQuery, selectedIds);
 
   const handleAdd = (user: User) => {
     setSelectedUsers((prev) => [...prev, user]);
     setSearchQuery('');
   };
   const handleRemove = (userId: string) => {
-    setSelectedUsers((prev) => prev.filter((u) => u.id !== userId));
+    setSelectedUsers((prev) => prev.filter((user) => user.id !== userId));
   };
 
   const handleCreate = async () => {
@@ -42,9 +42,9 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onClose, on
       return;
     }
     setError('');
-    setCreating(true);
+    setIsCreating(true);
     try {
-      await conversationsApi.createGroup(groupName.trim(), selectedUsers.map((u) => u.id));
+      await conversationsApi.createGroup(groupName.trim(), selectedUsers.map((user) => user.id));
       setGroupName('');
       setSearchQuery('');
       setSelectedUsers([]);
@@ -52,7 +52,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onClose, on
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to create group. Please try again.'));
     } finally {
-      setCreating(false);
+      setIsCreating(false);
     }
   };
 
@@ -68,7 +68,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onClose, on
           </Button>
           <PrimaryButton
             onClick={handleCreate}
-            loading={creating}
+            loading={isCreating}
             loadingText="Creating..."
             disabled={!groupName.trim() || selectedUsers.length === 0}
           >
@@ -112,7 +112,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onClose, on
           query={searchQuery}
           onQueryChange={setSearchQuery}
           results={results}
-          loading={loadingSearch}
+          isLoading={isSearching}
           actionLabel="Add"
           onSelect={handleAdd}
         />

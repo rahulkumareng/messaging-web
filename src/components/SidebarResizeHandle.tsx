@@ -19,22 +19,22 @@ const SidebarResizeHandle: React.FC<SidebarResizeHandleProps> = ({ width, min, m
   const startRef = React.useRef<{ x: number; w: number } | null>(null);
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
 
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     startRef.current = { x: e.clientX, w: width };
     e.currentTarget.setPointerCapture(e.pointerId);
     e.preventDefault();
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!startRef.current) return;
     onChange(clamp(startRef.current.w + (e.clientX - startRef.current.x)));
   };
 
-  const onPointerUp = () => {
+  const handlePointerUp = () => {
     startRef.current = null;
   };
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       onChange(clamp(width - 20));
@@ -58,10 +58,10 @@ const SidebarResizeHandle: React.FC<SidebarResizeHandleProps> = ({ width, min, m
       cursor="col-resize"
       touchAction="none"
       userSelect="none"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onKeyDown={onKeyDown}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onKeyDown={handleKeyDown}
       _hover={{ bg: 'warm.muted' }}
       _active={{ bg: 'warm.muted' }}
       _focusVisible={{ outline: '2px solid', outlineColor: 'border.accent', outlineOffset: '-2px' }}

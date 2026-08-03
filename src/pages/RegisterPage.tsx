@@ -12,7 +12,7 @@ const RegisterPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +39,7 @@ const RegisterPage: React.FC = () => {
       localStorage.setItem('email', email);
 
       navigate('/chat', { replace: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(getErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
@@ -158,7 +158,7 @@ const RegisterPage: React.FC = () => {
             color="text.inverse"
             _hover={{ bg: 'accent.hover' }}
             cartoon
-            loading={loading}
+            loading={isLoading}
             loadingText="Creating account..."
             disabled={!email || !password || !confirmPassword}
           >

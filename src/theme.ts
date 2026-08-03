@@ -76,9 +76,10 @@ const config = defineConfig({
         // Both modes tuned to clear WCAG AA (4.5:1) for the 12px meta text
         // (timestamps, message times): 4.57:1 light / 5.64:1 dark.
         'text.muted': { value: { base: '#6f6f78', _dark: '#8a8a94' } },
-        // White-on-accent text: the dark accent.solid is a DEEP blue (brand.600,
-        // white text 6.6:1) — the classic messaging convention, readable at
-        // rest (6.56:1) and hover (5.18:1 on brand.500).
+        // White-on-accent text: graphite accent.solid keeps white readable in
+        // both modes (11.4:1 on brand.500 in light, 7.4:1 on brand.400 in
+        // dark); hover deepens in light (brand.600) and lightens in dark
+        // (brand.300, 4.9:1).
         'text.inverse': { value: { base: '#ffffff', _dark: '#ffffff' } },
         'border.subtle': { value: { base: '#e6e6eb', _dark: '#2f2f37' } },
         'border.strong': { value: { base: '#d4d4dc', _dark: '#4a4a54' } },
@@ -115,9 +116,6 @@ const config = defineConfig({
             base: 'var(--chakra-colors-brand-600)',
             _dark: 'var(--chakra-colors-brand-100)',
           },
-        },
-        'accent.muted': {
-          value: { base: 'rgba(58, 58, 66, 0.08)', _dark: 'rgba(112, 112, 123, 0.16)' },
         },
         'warm.solid': {
           value: {
@@ -172,7 +170,6 @@ const config = defineConfig({
         // Light-mode solids darkened to clear 4.5:1 on the canvas for the
         // 12px "Connected"/"Connecting..." status labels (4.60 / 4.63).
         'success.solid': { value: { base: '#078049', _dark: '#3fcb85' } },
-        'success.muted': { value: { base: 'rgba(14, 159, 91, 0.1)', _dark: 'rgba(63, 203, 133, 0.14)' } },
         'danger.solid': { value: { base: '#c93a40', _dark: '#f2555a' } },
         'danger.muted': { value: { base: 'rgba(229, 72, 77, 0.08)', _dark: 'rgba(242, 85, 90, 0.14)' } },
         'danger.border': { value: { base: 'rgba(229, 72, 77, 0.25)', _dark: 'rgba(242, 85, 90, 0.8)' } },
@@ -217,9 +214,8 @@ const config = defineConfig({
               },
               _disabled: {
                 // Explicit gray, NOT an opacity wash: fading a colored button
-                // makes its label unreadable in both modes (white on pale blue
-                // in light, navy on faded blue in dark). Gray + muted text is
-                // unambiguous.
+                // makes its label unreadable in both modes (white on faded
+                // graphite). Gray + muted text is unambiguous.
                 opacity: '1',
                 bg: 'bg.hover',
                 color: 'text.secondary',
@@ -244,10 +240,6 @@ const config = defineConfig({
       },
     },
     keyframes: {
-      'fade-in': {
-        from: { opacity: '0' },
-        to: { opacity: '1' },
-      },
       // Auth card hero moment (the one large entrance).
       'fade-in-up': {
         from: { opacity: '0', transform: 'translateY(4px)' },

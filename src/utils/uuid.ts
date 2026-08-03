@@ -11,14 +11,23 @@
  */
 export function uuidV1Timestamp(uuid: string): number {
   // Canonical layout: time_low(8)-time_mid(4)-ver+time_hi(4)-clock(4)-node(12)
+  // Reject anything whose version nibble isn't '1' outright: a v4 (or any other
+  // version) uuid would parse into a plausible random 60-bit number instead of
+  // NaN, and comparisons against that garbage would corrupt watermark decisions
+  // (e.g. everything looks read, or nothing ever does). NaN is the safer
+  // failure — callers check Number.isNaN.
+  if (uuid[14] !== '1') return NaN;
   const timeLow = parseInt(uuid.slice(0, 8), 16);
   const timeMid = parseInt(uuid.slice(9, 13), 16);
   // char 14 is the version nibble; time_hi is the remaining 3 nibbles (12 bits)
   const timeHi = parseInt(uuid.slice(15, 18), 16);
   // Assemble the 60-bit value. The high terms exceed 2^32, so multiply rather
-  // than use bitwise OR (which truncates to 32 bits). The result stays well
-  // below 2^53, so it is represented exactly as a JS Number. A non-v1/non-uuid
-  // string yields NaN; comparisons with NaN are false, which safely excludes
-  // local optimistic ids (e.g. "temp-...") from read-marking.
+  // than use bitwise OR (which truncates to 32 bits). The value (~1.4e17 ticks
+  // today) is well ABOVE 2^53, so a JS Number keeps only ~37 of the 60 bits:
+  // nearby doubles round to 16-tick (1.6µs) granularity. Rounding is monotonic
+  // for adjacent ids, so chronological ordering survives despite the lost
+  // precision. Non-v1/non-uuid strings yield NaN; comparisons with NaN are
+  // false, which safely excludes local optimistic ids (e.g. "temp-...") from
+  // read-marking.
   return timeHi * 2 ** 48 + timeMid * 2 ** 32 + timeLow;
 }

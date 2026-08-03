@@ -12,7 +12,7 @@ interface ConversationItemProps {
   /** Last-message preview text (null/undefined → "No messages yet"). */
   preview?: string | null;
   /** Honest unread dot: newest message is incoming and newer than my read watermark. */
-  unread?: boolean;
+  hasUnread?: boolean;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
@@ -20,14 +20,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   isActive,
   onClick,
   preview,
-  unread,
+  hasUnread,
 }) => {
   const currentUserId = localStorage.getItem('userId');
 
   // For direct chats the label must be the OTHER participant — participants[0]
   // is just whatever row came first and is often the current user's own email,
   // which makes different conversations look identical in the list.
-  const otherParticipant = conversation.participants.find((p) => p.userId !== currentUserId);
+  const otherParticipant = conversation.participants.find(
+    (participant) => participant.userId !== currentUserId,
+  );
   const displayName =
     conversation.title ||
     (conversation.type === 'direct'
@@ -72,7 +74,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       )}
       <AvatarInitials name={displayName} />
       <Flex direction="column" flex="1" minW="0" align="flex-start">
-        <Text fontWeight={unread ? 'bold' : 'semibold'} fontSize="sm" truncate>
+        <Text fontWeight={hasUnread ? 'bold' : 'semibold'} fontSize="sm" truncate>
           {displayName}
         </Text>
         <Text fontSize="sm" color="text.secondary" truncate>
@@ -84,7 +86,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           {formatTime(conversation.updatedAt)}
         </Text>
         <Flex align="center" gap={1.5} minH="14px">
-          {unread && <Box boxSize="8px" borderRadius="full" bg="warm.solid" border="1.5px solid" borderColor="border.ink" />}
+          {hasUnread && !isActive && <Box boxSize="8px" borderRadius="full" bg="warm.solid" border="1.5px solid" borderColor="border.ink" />}
           {conversation.type === 'group' && <UsersIcon boxSize="12px" color="text.secondary" />}
         </Flex>
       </VStack>

@@ -19,7 +19,7 @@ export function useUserSearch(
 ) {
   const { minChars = 2, debounceMs = 500 } = opts;
   const [results, setResults] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -28,25 +28,35 @@ export function useUserSearch(
       return;
     }
 
+    let cancelled = false;
+
     const timer = setTimeout(async () => {
-      setLoading(true);
+      setIsLoading(true);
       try {
         const res = await usersApi.search(trimmed);
+        if (cancelled) return;
         const excludes = excludeIds instanceof Set ? excludeIds : new Set(excludeIds);
-        setResults(res.data.filter((u) => !excludes.has(u.id)));
+        setResults(res.data.filter((user) => !excludes.has(user.id)));
       } catch (err) {
+        if (cancelled) return;
         console.error('Failed to search users:', err);
         setResults([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }, debounceMs);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
     // excludeIds is intentionally NOT in deps: callers typically pass a fresh
     // Set from a derived selector each render and re-running on it would
     // spam the API. If you ever need it to react, wrap the Set with useMemo.
   }, [query, minChars, debounceMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { results, loading };
+  // `isLoading` is the hook's public return key, destructured by
+  // NewDirectChatModal, GroupSettingsModal and CreateGroupModal (aliased
+  // locally as `isSearching`).
+  return { results, isLoading };
 }

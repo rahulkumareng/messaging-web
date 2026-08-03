@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { ChatMessage, Conversation } from '../api/client';
+import type { Conversation } from '../api/client';
 import { messagesApi } from '../api/client';
-import type { ChatMessageItem } from '../components/ChatView';
+import { PREVIEW_FETCH_LIMIT } from '../constants';
+import type { ChatMessageItem } from '../types/messages';
+import { toPreviewItem } from '../utils/preview';
 
 /**
  * Module-scope guard: one preview backfill per conversation, ever. Survives
@@ -15,7 +17,8 @@ const previewFetchGuard = new Set<string>();
  * that has no real history loaded, fetches the latest single message so the
  * sidebar shows a real preview instead of "No messages yet". Real history
  * (added by `useMessages`) supersedes the backfill, so this stays simple —
- * one fetch, one cache entry, never re-fetched.
+ * one fetch, one cache entry, never re-fetched. The message→preview shaping
+ * is delegated to the pure `toPreviewItem`.
  */
 export function usePreviewMap(
   conversations: Conversation[],
@@ -24,33 +27,34 @@ export function usePreviewMap(
   const [previewMap, setPreviewMap] = useState<Record<string, ChatMessageItem>>({});
 
   useEffect(() => {
-    for (const conv of conversations) {
-      if (messagesMap[conv.id]?.length) continue; // real data already present
-      if (previewFetchGuard.has(conv.id)) continue;
-      previewFetchGuard.add(conv.id);
+    let cancelled = false;
+    for (const conversation of conversations) {
+      if (messagesMap[conversation.id]?.length) continue; // real data already present
+      if (previewFetchGuard.has(conversation.id)) continue;
 
       messagesApi
-        .getMessages(conv.id, 1)
+        .fetchMessages(conversation.id, PREVIEW_FETCH_LIMIT)
         .then((res) => {
-          const m: ChatMessage | undefined = res.data.messages?.[0];
-          if (m) {
+          if (cancelled) return;
+          // Only a SUCCESSFUL fetch claims the conversation — a transient
+          // network failure leaves the guard unset so the next run retries the
+          // backfill instead of permanently blocking the preview this session.
+          previewFetchGuard.add(conversation.id);
+          const message = res.data.messages?.[0];
+          if (message) {
             setPreviewMap((prev) => ({
               ...prev,
-              [conv.id]: {
-                id: m.id,
-                conversationId: m.conversationId,
-                senderId: m.senderId,
-                content: m.content,
-                createdAt: m.createdAt,
-                status: 'delivered' as const,
-              },
+              [conversation.id]: toPreviewItem(message),
             }));
           }
         })
         .catch(() => {
-          // Silent: preview stays at "No messages yet".
+          // Silent fallback: preview stays at "No messages yet".
         });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [conversations, messagesMap]);
 
   return previewMap;

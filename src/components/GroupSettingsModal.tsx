@@ -25,7 +25,7 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
   const [groupName, setGroupName] = useState(conversation.title || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
-  const [saving, setSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
   // Reset state when modal opens or conversation changes.
@@ -39,10 +39,10 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
   }, [isOpen, conversation]);
 
   // Exclude already-existing participants AND just-added ones from the search.
-  const existingIds = new Set(conversation.participants.map((p) => p.userId));
-  const selectedIds = new Set(selectedUsers.map((u) => u.id));
+  const existingIds = new Set(conversation.participants.map((participant) => participant.userId));
+  const selectedIds = new Set(selectedUsers.map((user) => user.id));
   const excluding = new Set([...existingIds, ...selectedIds]);
-  const { results, loading } = useUserSearch(searchQuery, excluding);
+  const { results, isLoading: isSearching } = useUserSearch(searchQuery, excluding);
 
   const handleAdd = (user: User) => {
     setSelectedUsers((prev) => [...prev, user]);
@@ -55,7 +55,7 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
       return;
     }
     setError('');
-    setSaving(true);
+    setIsSaving(true);
     try {
       if (groupName.trim() !== conversation.title) {
         await conversationsApi.updateTitle(conversation.id, groupName.trim());
@@ -63,19 +63,19 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
       if (selectedUsers.length > 0) {
         await conversationsApi.addParticipants(
           conversation.id,
-          selectedUsers.map((u) => u.id),
+          selectedUsers.map((user) => user.id),
         );
       }
       onSuccess();
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to update group. Please try again.'));
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
-  const titleDirty = groupName.trim() !== conversation.title;
-  const hasChanges = titleDirty || selectedUsers.length > 0;
+  const isTitleDirty = groupName.trim() !== conversation.title;
+  const hasChanges = isTitleDirty || selectedUsers.length > 0;
 
   return (
     <AppDialog
@@ -89,7 +89,7 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
           </Button>
           <PrimaryButton
             onClick={handleSave}
-            loading={saving}
+            loading={isSaving}
             loadingText="Saving..."
             disabled={!hasChanges}
           >
@@ -132,7 +132,7 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
           query={searchQuery}
           onQueryChange={setSearchQuery}
           results={results}
-          loading={loading}
+          isLoading={isSearching}
           actionLabel="Add"
           onSelect={handleAdd}
         />
@@ -140,7 +140,7 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
 
       <SelectedUserChips
         users={selectedUsers}
-        onRemove={(id) => setSelectedUsers((prev) => prev.filter((u) => u.id !== id))}
+        onRemove={(id) => setSelectedUsers((prev) => prev.filter((user) => user.id !== id))}
         label={`Users to Add (${selectedUsers.length})`}
       />
 
@@ -149,13 +149,13 @@ const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
           Current Participants ({conversation.participants.length})
         </Text>
         <VStack align="stretch" gap={2}>
-          {conversation.participants.map((p) => (
-            <Flex key={p.userId} align="center" gap={2.5}>
-              <AvatarInitials name={p.email} size="small" />
+          {conversation.participants.map((participant) => (
+            <Flex key={participant.userId} align="center" gap={2.5}>
+              <AvatarInitials name={participant.email} size="small" />
               <Text fontSize="sm" minW="0" truncate>
-                {p.email}
+                {participant.email}
               </Text>
-              {p.role === 'admin' && (
+              {participant.role === 'admin' && (
                 <Badge
                   colorPalette="warm"
                   variant="subtle"

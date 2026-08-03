@@ -1,23 +1,19 @@
 import { useMemo, useState, useCallback } from 'react';
-import type { ChatMessageItem } from '../components/ChatView';
+import type { ChatMessageItem } from '../types/messages';
 import type { Conversation } from '../api/client';
-import { uuidV1Timestamp } from '../utils/uuid';
+import { isConversationUnread } from '../utils/unread';
 
 /**
  * Owns the sidebar's unread dot + per-conversation read watermark.
  *
  * `lastMessageMap` merges real history (`messagesMap`) with the backfill
- * (`previewMap`); real history wins because it has more context and is
- * always newer or equal to the backfill.
- *
- * The unread rule is intentionally one-sided: the newest message is
- * incoming AND its timeuuid timestamp is strictly greater than my read
- * watermark. Optimistic temp-ids have NaN timestamps and can never light
- * the dot.
+ * (`previewMap`); real history wins because it has more context and is always
+ * newer or equal to the backfill. The unread rule itself is delegated to the
+ * pure `isConversationUnread` helper.
  *
  * `markWatermark` lets the orchestrator advance the watermark synchronously
- * when a user opens a conversation (so the dot clears immediately, before
- * the next render from server state).
+ * when a user opens a conversation (so the dot clears immediately, before the
+ * next render from server state).
  */
 export function useUnreadMap(
   conversations: Conversation[],
@@ -32,28 +28,31 @@ export function useUnreadMap(
   }, []);
 
   const lastMessageMap = useMemo(() => {
-    const result: Record<string, ChatMessageItem> = {};
-    for (const conv of conversations) {
-      const list = messagesMap[conv.id];
-      result[conv.id] = list && list.length > 0 ? list[list.length - 1] : previewMap[conv.id];
+    const map: Record<string, ChatMessageItem> = {};
+    for (const conversation of conversations) {
+      const messages = messagesMap[conversation.id];
+      map[conversation.id] =
+        messages && messages.length > 0
+          ? messages[messages.length - 1]
+          : previewMap[conversation.id];
     }
-    return result;
+    return map;
   }, [conversations, messagesMap, previewMap]);
 
   const unreadMap = useMemo(() => {
-    const result: Record<string, boolean> = {};
-    for (const conv of conversations) {
-      const me = conv.participants.find((p) => p.userId === currentUserId);
-      const watermarkId = watermarks[conv.id] ?? me?.lastReadMessageId ?? null;
-      const wmTs = watermarkId ? uuidV1Timestamp(watermarkId) : 0;
-      const last = lastMessageMap[conv.id];
-      if (!last?.id) continue;
-
-      const lastTs = uuidV1Timestamp(last.id);
-      result[conv.id] =
-        last.senderId !== currentUserId && !Number.isNaN(lastTs) && lastTs > wmTs;
+    const map: Record<string, boolean> = {};
+    for (const conversation of conversations) {
+      const me = conversation.participants.find(
+        (participant) => participant.userId === currentUserId,
+      );
+      const watermarkId = watermarks[conversation.id] ?? me?.lastReadMessageId ?? null;
+      map[conversation.id] = isConversationUnread(
+        lastMessageMap[conversation.id],
+        currentUserId,
+        watermarkId,
+      );
     }
-    return result;
+    return map;
   }, [conversations, lastMessageMap, watermarks, currentUserId]);
 
   return { unreadMap, lastMessageMap, markWatermark };
